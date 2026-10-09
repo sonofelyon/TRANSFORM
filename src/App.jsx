@@ -587,6 +587,7 @@ function AppMain({ settings }) {
 
   // People mgmt
   const [addName, setAddName] = useState("");
+  const [addPhone, setAddPhone] = useState("");
   const [addType, setAddType] = useState("student");
   const [addGroup, setAddGroup] = useState("hs");
   const [search, setSearch] = useState("");
@@ -611,7 +612,7 @@ function AppMain({ settings }) {
   const isSaving = useRef(false);
 
   // Admin auth
-  const [adminAuthed, setAdminAuthedState] = useState(() => isAdminAuthed());
+  const [adminAuthed, setAdminAuthedState] = useState(true); // No login required; keep all existing tabs available.
   const [showAdminPrompt, setShowAdminPrompt] = useState(false);
   const [adminPwInput, setAdminPwInput] = useState("");
   const [adminPwError, setAdminPwError] = useState("");
@@ -954,10 +955,11 @@ function AppMain({ settings }) {
 
   function addPerson() {
     if (!addName.trim()) return;
-    setPeople(prev => [...prev, { id: genId(), name: addName.trim(), type: addType, group: addType === "student" ? addGroup : null, grade: addType === "student" && addGrade ? Number(addGrade) : null, active: true, prayedAt: null, prayerRequests: [], birthday: addBday.trim() || "", updatedAt: Date.now() }]);
+    setPeople(prev => [...prev, { id: genId(), name: addName.trim(), type: addType, group: addType === "student" ? addGroup : null, grade: addType === "student" && addGrade ? Number(addGrade) : null, phone: addType === "student" ? addPhone.trim() : "", contacted: false, active: true, prayedAt: null, prayerRequests: [], birthday: addBday.trim() || "", updatedAt: Date.now() }]);
     setAddBday("");
     setAddName("");
     setAddGrade("");
+    setAddPhone("");
   }
 
   function cycleGroup(id) {
@@ -1065,14 +1067,7 @@ function AppMain({ settings }) {
   }
 
   function handleTabClick(v) {
-    if ((v === "people" || v === "import") && !adminAuthed) {
-      setPendingView(v);
-      setAdminPwInput("");
-      setAdminPwError("");
-      setShowAdminPrompt(true);
-    } else {
-      setView(v);
-    }
+    setView(v);
   }
 
   async function recalculateHistory() {
@@ -1493,6 +1488,7 @@ function AppMain({ settings }) {
           <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px", display:"flex", flexDirection:"column", gap:8, marginBottom:4 }}>
             <p style={{ margin:0, fontSize:11, color:C.muted, textTransform:"uppercase", letterSpacing:"0.06em", fontWeight:600 }}>Add Person</p>
             <input value={addName} onChange={e => setAddName(e.target.value)} onKeyDown={e => e.key === "Enter" && addPerson()} placeholder="Full name" style={{ ...S.addInput, margin:0 }} />
+            {addType === "student" && <input type="tel" value={addPhone} onChange={e => setAddPhone(e.target.value)} onKeyDown={e => e.key === "Enter" && addPerson()} placeholder="Phone number (optional)" style={{ ...S.addInput, margin:0 }} />}
             <div style={{ display:"flex", gap:8 }}>
               <select value={addType} onChange={e => { setAddType(e.target.value); }} style={{ ...S.addTypeSelect, flex:1 }}>
                 <option value="student">Student</option>
@@ -1610,14 +1606,26 @@ function AppMain({ settings }) {
                   </div>
                 )}
                 {p.type === "student" && (
-                  <div style={S.gradeRow}>
-                    <span style={S.gradeLabel}>Grade</span>
-                    <select value={p.grade || ""} onChange={e => setPeople(prev => prev.map(q => q.id === p.id ? { ...q, grade: e.target.value ? Number(e.target.value) : null, updatedAt: Date.now() } : q))}
-                      style={S.gradeSelect}>
-                      <option value="">—</option>
-                      {[5,6,7,8,9,10,11,12].map(g => <option key={g} value={g}>{`Grade ${g}`}</option>)}
-                    </select>
-                  </div>
+                  <>
+                    <div style={S.gradeRow}>
+                      <span style={S.gradeLabel}>Grade</span>
+                      <select value={p.grade || ""} onChange={e => setPeople(prev => prev.map(q => q.id === p.id ? { ...q, grade: e.target.value ? Number(e.target.value) : null, updatedAt: Date.now() } : q))}
+                        style={S.gradeSelect}>
+                        <option value="">—</option>
+                        {[5,6,7,8,9,10,11,12].map(g => <option key={g} value={g}>{`Grade ${g}`}</option>)}
+                      </select>
+                    </div>
+                    <div style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 0 2px", flexWrap:"wrap" }}>
+                      <label style={{ fontSize:12, color:C.muted, minWidth:58 }}>Phone</label>
+                      <input type="tel" value={p.phone || ""} onChange={e => setPeople(prev => prev.map(q => q.id === p.id ? { ...q, phone: e.target.value, updatedAt: Date.now() } : q))}
+                        placeholder="Add phone number" aria-label={`Phone number for ${p.name}`}
+                        style={{ ...S.addInput, flex:1, minWidth:130, margin:0, fontSize:13 }} />
+                      <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:p.contacted ? C.accentLight : C.muted, whiteSpace:"nowrap", cursor:"pointer" }}>
+                        <input type="checkbox" checked={!!p.contacted} onChange={e => setPeople(prev => prev.map(q => q.id === p.id ? { ...q, contacted: e.target.checked, updatedAt: Date.now() } : q))} />
+                        Contacted
+                      </label>
+                    </div>
+                  </>
                 )}
               </div>
             ))}
@@ -1865,13 +1873,7 @@ function AppMain({ settings }) {
 
         </div>
       )}
-      {/* Admin footer link */}
-      <div style={S.adminFooter}>
-        {adminAuthed
-          ? <button onClick={() => { setAdminAuthedState(false); localStorage.removeItem(ADMIN_KEY); setView("pray"); }} style={S.adminLink}>lock admin</button>
-          : <button onClick={() => { setAdminPwInput(""); setAdminPwError(""); setShowAdminPrompt(true); }} style={S.adminLink}>admin</button>
-        }
-      </div>
+
     </div>
   );
 }
