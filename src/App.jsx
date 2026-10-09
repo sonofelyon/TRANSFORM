@@ -310,6 +310,13 @@ function parseCSV(text) {
     ? headers.findIndex(h => h.includes("name") || h.includes("student") || h.includes("person") || h.includes("contact"))
     : -1;
 
+  // Locate grade, phone, and student/leader role columns.
+  const gradeIdx = headers.findIndex(h => ["grade","gradelevel","schoolgrade","year"].includes(h));
+  const phoneIdx = headers.findIndex(h => ["phone","phonenumber","cell","cellphone","mobile","mobilephone","studentphone","contactnumber","telephone"].includes(h));
+  const typeIdx = headers.findIndex(h => ["type","role","persontype","studentorleader","leaderorstudent","category","status"].includes(h));
+  const leaderIdx = headers.findIndex(h => ["isleader","leader"].includes(h));
+  const studentIdx = headers.findIndex(h => ["isstudent"].includes(h));
+
   // Locate birthday column
   const bdayIdx = headers.findIndex(h =>
     h.includes("birth") || h.includes("bday") || h.includes("dob") || h === "bd" || h === "birthday"
@@ -355,7 +362,15 @@ function parseCSV(text) {
     const bi = hasHeader ? bdayIdx : fallbackBdayIdx;
     const birthday = bi >= 0 && cells[bi] ? parseBirthdayStr(cells[bi]) : "";
 
-    return { name, birthday };
+    const gradeText = gradeIdx >= 0 ? (cells[gradeIdx] || "").trim() : "";
+    const gradeMatch = gradeText.match(/^(?:grade\\s*)?(\\d{1,2})(?:th|st|nd|rd)?$/i);
+    const grade = gradeMatch && Number(gradeMatch[1]) >= 1 && Number(gradeMatch[1]) <= 12 ? Number(gradeMatch[1]) : null;
+    const phone = phoneIdx >= 0 ? (cells[phoneIdx] || "").trim() : "";
+    const role = typeIdx >= 0 ? (cells[typeIdx] || "").trim().toLowerCase() : "";
+    const leaderFlag = leaderIdx >= 0 ? (cells[leaderIdx] || "").trim().toLowerCase() : "";
+    const studentFlag = studentIdx >= 0 ? (cells[studentIdx] || "").trim().toLowerCase() : "";
+    const type = /^(leader|adult|volunteer|staff|teacher|mentor)$/.test(role) || /^(yes|true|1|y)$/.test(leaderFlag) || /^(no|false|0|n)$/.test(studentFlag) ? "leader" : "student";
+    return { name, birthday, grade, phone, type };
   }).filter(Boolean);
 }
 
@@ -978,11 +993,11 @@ function AppMain({ settings }) {
   function restore(id) { setPeople(prev => prev.map(p => p.id === id ? { ...p, active: true, updatedAt: Date.now() } : p)); }
   function exportRoster() {
     const rows = [
-      ["First Name", "Last Name", "Type", "Group", "Grade", "Birthday"],
+      ["First Name", "Last Name", "Type", "Grade", "Phone", "Birthday"],
       ...people.filter(p => p.active !== false).map(p => {
         const [first, ...rest] = (p.name || "").trim().split(" ");
         const last = rest.join(" ");
-        return [first, last, p.type || "", (p.group || "").toUpperCase(), p.grade || "", p.birthday || ""];
+        return [first, last, p.type || "", p.grade || "", p.phone || "", p.birthday || ""];
       })
     ];
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -1060,7 +1075,7 @@ function AppMain({ settings }) {
     const existing = new Set(people.map(p => p.name.toLowerCase()));
     const toAdd = (importData || [])
       .filter(p => !existing.has(p.name.toLowerCase()))
-      .map(p => ({ id: genId(), name: p.name, type: "student", group: null, active: true, prayedAt: null, prayerRequests: [], birthday: p.birthday || "" }));
+      .map(p => ({ id: genId(), name: p.name, type: p.type || "student", group: null, grade: p.grade, phone: p.phone || "", contacted: false, contactedAt: null, active: true, prayedAt: null, prayerRequests: [], birthday: p.birthday || "", updatedAt: Date.now() }));
     setPeople(prev => [...prev, ...toAdd]);
     setImportData(null);
     setView("people");
@@ -1820,7 +1835,7 @@ function AppMain({ settings }) {
 
           <h3 style={S.importTitle}>Import CSV</h3>
           <p style={S.importDesc}>
-            Just export whatever roster you already have. The importer only looks for name and birthday columns — everything else is ignored.
+            Upload a CSV with names, grades, phone numbers, birthdays, and student/leader roles. The importer matches common column headings automatically.
           </p>
 
           <div style={S.importRulesBox}>
@@ -1838,12 +1853,16 @@ function AppMain({ settings }) {
             </div>
             <div style={S.importRule}>
               <span style={{ ...S.importRuleIcon, fontFamily:"monospace", fontSize:13 }}>ST</span>
-              <div>All imported people start as <strong style={{ color: C.cream }}>Students</strong>. Change roles in the People tab after importing.</div>
+              <div><strong style={{ color: C.cream }}>Student or Leader</strong> — use a Type or Role column with Student or Leader. If blank, the person defaults to Student.</div>
+            </div>
+            <div style={S.importRule}>
+              <span style={{ ...S.importRuleIcon, fontFamily:"monospace", fontSize:13 }}>#</span>
+              <div><strong style={{ color:C.cream }}>Grade and Phone</strong> — recognizes Grade, Grade Level, Phone, Phone Number, Cell, and Mobile.</div>
             </div>
           </div>
 
-          <pre style={S.csvPreview}>{`Last Name,First Name,Grade,Email,DOB\nSmith,John,10,j@school.edu,03/15\nLee,Sarah,11,s@school.edu,11-02\nBrown,Mike,9,,`}</pre>
-          <p style={S.importNote}>Above: a messy real-world export — Grade and Email columns are simply ignored.</p>
+          <pre style={S.csvPreview}>{`First Name,Last Name,Type,Grade,Phone,Birthday\nJohn,Smith,Student,10,555-123-4567,03/15\nSarah,Lee,Student,11,555-222-3333,11-02\nMike,Brown,Leader,,555-444-5555,`}</pre>
+          <p style={S.importNote}>Existing names are skipped to avoid duplicates; their saved information is not overwritten. Review the preview before importing.</p>
 
           <button onClick={() => fileRef.current.click()} style={S.uploadBtn}>
             <Upload size={16} style={{ marginRight: 8 }} /> Choose File
@@ -1856,7 +1875,7 @@ function AppMain({ settings }) {
               <div style={S.previewScroll}>
                 {importData.slice(0, 12).map((p, i) => (
                   <div key={i} style={S.previewRow}>
-                    <span style={S.previewName}>{p.name}</span>
+                    <span style={S.previewName}>{p.name} · {p.type === "leader" ? "Leader" : "Student"}{p.grade ? ` · Grade ${p.grade}` : ""}{p.phone ? ` · ${p.phone}` : ""}</span>
                     {p.birthday
                       ? <span style={S.bdayBadgeSm}><Cake size={9} style={{ marginRight: 3 }} />{formatBirthday(p.birthday)}</span>
                       : <span style={{ fontSize: 11, color: C.faint }}>no birthday</span>
