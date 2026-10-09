@@ -1135,7 +1135,7 @@ function AppMain({ settings }) {
         sum + (p.prayedWeekDate === wDateStr && p.weekPrayCount ? p.weekPrayCount : 1), 0
       );
       if (count > 0) {
-        newHistory.push({ weekStart: wEnd, prevWeekStart: wStart, prevWeekDateStr: wDateStr, count, total: activePeople.length });
+        newHistory.push({ ...weekHistory.find(w => w.weekStart === wEnd), weekStart: wEnd, prevWeekStart: wStart, prevWeekDateStr: wDateStr, count, total: activePeople.length });
       }
     }
     setWeekHistory(newHistory);
