@@ -1161,6 +1161,7 @@ function AppMain({ settings }) {
   const bdayStatus = current ? getBirthdayStatus(current.birthday) : null;
   const prayedThis = activePeople.filter(p => withinWeek(p.prayedAt)).sort((a, b) => b.prayedAt - a.prayedAt);
   const notPrayedThis = activePeople.filter(p => !withinWeek(p.prayedAt)).sort((a, b) => a.name.localeCompare(b.name));
+  const contactedThis = activePeople.filter(p => p.type === "student" && withinWeek(p.contactedAt)).sort((a, b) => b.contactedAt - a.contactedAt);
 
   return (
     <div style={S.root}>
@@ -1522,6 +1523,27 @@ function AppMain({ settings }) {
                 </div>
               ))
             }
+          </div>
+
+          <div style={S.weekSection}>
+            <div style={S.sectionHead}>
+              <span style={{ color:C.accent, marginRight:7, fontSize:15 }}>✓</span>
+              <span style={S.sectionTitle}>Contacted — {contactedThis.length}</span>
+            </div>
+            {contactedThis.length === 0 ? (
+              <p style={S.weekEmpty}>No students marked as contacted this week.</p>
+            ) : contactedThis.map(p => (
+              <div key={p.id} onClick={() => goToPerson(p.id)} style={{ ...S.weekRow, cursor:"pointer" }}>
+                <div>
+                  <div style={{ ...S.weekName, display:"flex", alignItems:"center", gap:6 }}>
+                    {p.name}
+                    {(p.weekContactCount || 0) >= 2 && <span style={{ fontSize:11, color:C.accent, fontWeight:700, background:C.faint, padding:"1px 6px", borderRadius:8 }}>x{p.weekContactCount}</span>}
+                  </div>
+                  <div style={S.weekMeta}>{timeAgo(p.contactedAt)}</div>
+                </div>
+                <span style={{ color:C.accent, fontSize:18 }}>✓</span>
+              </div>
+            ))}
           </div>
 
           <div style={S.weekSection}>
