@@ -718,8 +718,8 @@ function AppMain({ settings }) {
         }
         // Record the previous calendar month when the app is opened after rollover.
         // Only last recorded activity is available; do not invent missing events.
-        const currentMonth = getMonthKeyET();
-        const priorMonth = getMonthKeyET(new Date(new Date().toLocaleString("en-US", {timeZone:"America/New_York"})).setDate(0));
+        const easternNow = new Date(new Date().toLocaleString("en-US", {timeZone:"America/New_York"}));
+        const priorMonth = getMonthKeyET(new Date(easternNow.getFullYear(), easternNow.getMonth(), 0, 12).getTime());
         if (!months.some(m => m.month === priorMonth) && data.some(p => p.prayedMonthKey === priorMonth || p.contactedMonthKey === priorMonth)) {
           const active = data.filter(p => p.active !== false);
           const students = active.filter(p => p.type === "student");
