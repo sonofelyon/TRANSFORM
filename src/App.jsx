@@ -589,7 +589,7 @@ function AppMain({ settings }) {
   const [addName, setAddName] = useState("");
   const [addPhone, setAddPhone] = useState("");
   const [addType, setAddType] = useState("student");
-  const [addGroup, setAddGroup] = useState("hs");
+
   const [search, setSearch] = useState("");
   const [editBdayFor, setEditBdayFor] = useState(null);
   const [editNameFor, setEditNameFor] = useState(null);
@@ -950,12 +950,12 @@ function AppMain({ settings }) {
   const [addBday, setAddBday] = useState("");
   const [peopleSort, setPeopleSort] = useState("name");
   const [peopleTypeFilter, setPeopleTypeFilter] = useState("all");
-  const [rosterGroup, setRosterGroup] = useState("all"); // all | ms | hs | leader
+  const [rosterGroup, setRosterGroup] = useState("all");
   const [rosterSort, setRosterSort] = useState("name"); // name | grade | birthday
 
   function addPerson() {
     if (!addName.trim()) return;
-    setPeople(prev => [...prev, { id: genId(), name: addName.trim(), type: addType, group: addType === "student" ? addGroup : null, grade: addType === "student" && addGrade ? Number(addGrade) : null, phone: addType === "student" ? addPhone.trim() : "", contacted: false, active: true, prayedAt: null, prayerRequests: [], birthday: addBday.trim() || "", updatedAt: Date.now() }]);
+    setPeople(prev => [...prev, { id: genId(), name: addName.trim(), type: addType, group: null, grade: addType === "student" && addGrade ? Number(addGrade) : null, phone: addType === "student" ? addPhone.trim() : "", contacted: false, active: true, prayedAt: null, prayerRequests: [], birthday: addBday.trim() || "", updatedAt: Date.now() }]);
     setAddBday("");
     setAddName("");
     setAddGrade("");
@@ -1181,8 +1181,8 @@ function AppMain({ settings }) {
             </div>
             <select value={filter} onChange={e => { setFilter(e.target.value); setCardIdx(0); if (shouldShowTap()) setReady(false); }} style={S.filterSelect}>
               <option value="all">Everyone</option>
-              <option value="ms-students">MS Students</option>
-              <option value="hs-students">HS Students</option>
+
+              <option value="students">Students</option>
               <option value="leaders">Leaders</option>
             </select>
             {order === "random" && (
@@ -1485,7 +1485,6 @@ function AppMain({ settings }) {
                   {p.prayedAt && <div style={S.weekMeta}>Last: {timeAgo(p.prayedAt)}</div>}
                 </div>
                 <div style={{ display: "flex", gap: 4 }}>
-                  {p.group && <span style={{ ...S.badgeSm, ...(p.group === "hs" ? S.hsBadgeSm : S.msBadgeSm) }}>{p.group.toUpperCase()}</span>}
                   <span style={{ ...S.badgeSm, ...(p.type === "leader" ? S.leaderBadgeSm : S.studentBadgeSm) }}>{p.type}</span>
                 </div>
               </div>
@@ -1507,12 +1506,8 @@ function AppMain({ settings }) {
                 <option value="student">Student</option>
                 <option value="leader">Leader</option>
               </select>
-              <select value={addGroup} onChange={e => setAddGroup(e.target.value)} style={{ ...S.addTypeSelect, flex:1 }}>
-                <option value="hs">HS</option>
-                <option value="ms">MS</option>
-              </select>
               {addType === "student" && (
-                <select value={addGrade} onChange={e => { const g = e.target.value; setAddGrade(g); if (g) setAddGroup(Number(g) >= 9 ? "hs" : "ms"); }} style={{ ...S.addTypeSelect, flex:1 }}>
+                <select value={addGrade} onChange={e => setAddGrade(e.target.value)} style={{ ...S.addTypeSelect, flex:1 }}>
                   <option value="">Grade</option>
                   {[5,6,7,8,9,10,11,12].map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
@@ -1525,7 +1520,7 @@ function AppMain({ settings }) {
           </div>
 
           <div style={S.statRow}>
-            {[[`${activePeople.length}`, "total"], [`${activePeople.filter(p => p.group === "hs").length}`, "HS"], [`${activePeople.filter(p => p.group === "ms").length}`, "MS"], [`${prayedCount}`, "prayed ✓"]].map(([n, l]) => (
+            {[[`${activePeople.length}`, "total"], [`${activePeople.filter(p => p.type === "student").length}`, "students"], [`${activePeople.filter(p => p.type === "leader").length}`, "leaders"], [`${prayedCount}`, "prayed ✓"]].map(([n, l]) => (
               <div key={l} style={S.statChip}><span style={S.statNum}>{n}</span><span style={S.statLbl}>{l}</span></div>
             ))}
           </div>
@@ -1540,7 +1535,7 @@ function AppMain({ settings }) {
           </div>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search people…" style={{ ...S.addInput, marginBottom: 4 }} />
           <div style={{ display:"flex", gap:16, marginBottom:10, justifyContent:"center" }}>
-            {[["name","A–Z"],["group","MS/HS"],["grade","Grade"],["birthday","Birthday"]].map(([val, label]) => (
+            {[["name","A–Z"],["grade","Grade"],["birthday","Birthday"]].map(([val, label]) => (
               <button key={val} onClick={() => setPeopleSort(val)} style={{ background:"none", border:"none", borderBottom: peopleSort === val ? `2px solid ${C.accent}` : "2px solid transparent", color: peopleSort === val ? C.cream : C.muted, fontSize:13, fontWeight: peopleSort === val ? 500 : 400, padding:"2px 0", cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif", transition:"color 0.15s" }}>
                 {label}
               </button>
@@ -1601,9 +1596,6 @@ function AppMain({ settings }) {
                   <div style={S.personActions}>
                     <button onClick={() => { setEditBdayFor(editBdayFor === p.id ? null : p.id); setBdayInput(p.birthday || ""); setEditNameFor(null); }}
                       style={{ ...S.iconBtn, color: p.birthday ? C.accent : C.muted }} title="Set birthday"><Cake size={13} /></button>
-                    <button onClick={() => cycleGroup(p.id)} style={{ ...S.iconBtn, color: p.group === "hs" ? "#7aafc4" : p.group === "ms" ? "#8eba95" : C.muted }} title="Cycle HS/MS/none">
-                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.02em" }}>{p.group ? p.group.toUpperCase() : "—"}</span>
-                    </button>
                     <button onClick={() => toggleType(p.id)} style={S.iconBtn} title="Toggle role"><RefreshCw size={13} /></button>
                     <button onClick={() => deactivate(p.id)} style={{ ...S.iconBtn, color: C.muted }} title="Make inactive"><Trash2 size={13} /></button>
                   </div>
@@ -1694,7 +1686,7 @@ function AppMain({ settings }) {
         <div style={S.importWrap}>
           {/* Group filter */}
           <div style={{ display:"flex", gap:0, marginBottom:12, borderRadius:10, overflow:"hidden", border:`1px solid ${C.border}` }}>
-            {[["all","All"],["ms","MS"],["hs","HS"],["leader","Leaders"]].map(([val, label]) => (
+            {[["all","All"],["student","Students"],["leader","Leaders"]].map(([val, label]) => (
               <button key={val} onClick={() => setRosterGroup(val)} style={{ flex:1, background: rosterGroup === val ? C.accent : C.surface, border:"none", color: rosterGroup === val ? "#fff" : C.muted, padding:"9px 0", fontSize:13, fontWeight: rosterGroup === val ? 600 : 400, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif", transition:"background 0.15s" }}>
                 {label}
               </button>
@@ -1713,7 +1705,7 @@ function AppMain({ settings }) {
           {/* People list */}
           <div style={{ display:"flex", flexDirection:"column", gap:1 }}>
             {activePeople
-              .filter(p => rosterGroup === "all" ? true : rosterGroup === "leader" ? p.type === "leader" : p.group === rosterGroup && p.type === "student")
+              .filter(p => rosterGroup === "all" ? true : p.type === rosterGroup)
               .slice().sort((a, b) => {
                 if (rosterSort === "grade") {
                   const ga = Number(a.grade) || 99;
@@ -1762,7 +1754,7 @@ function AppMain({ settings }) {
                 );
               })
             }
-            {activePeople.filter(p => rosterGroup === "all" ? true : rosterGroup === "leader" ? p.type === "leader" : p.group === rosterGroup && p.type === "student").length === 0 && (
+            {activePeople.filter(p => rosterGroup === "all" ? true : p.type === rosterGroup).length === 0 && (
               <p style={{ textAlign:"center", color:C.muted, fontSize:13, padding:"32px 0" }}>No one in this group yet.</p>
             )}
           </div>
