@@ -1319,9 +1319,12 @@ function AppMain({ settings }) {
                             {current.phone ? <a href={`tel:${current.phone}`} style={{ color:C.accentLight, textDecoration:"none" }}>{current.phone}</a> : <span style={{ color:C.muted }}>Not added</span>}
                           </div>
                           <label style={{ display:"flex", alignItems:"center", gap:8, fontSize:13, color:current.contacted ? C.accentLight : C.muted, cursor:"pointer" }}>
-                            <input type="checkbox" checked={!!current.contacted} onChange={e => setPeople(prev => prev.map(q => q.id === current.id ? { ...q, contacted: e.target.checked, updatedAt: Date.now() } : q))} />
+                            <input type="checkbox" checked={!!current.contacted} onChange={e => setPeople(prev => prev.map(q => q.id === current.id ? { ...q, contacted: e.target.checked, ...(e.target.checked ? { contactedAt: Date.now() } : {}), updatedAt: Date.now() } : q))} />
                             Contacted
                           </label>
+                          <span style={{ fontSize:13, color:C.muted }}>
+                            Last Contacted: {current.contactedAt ? new Date(current.contactedAt).toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" }) : "Not yet recorded"}
+                          </span>
                         </div>
                       )}
 
