@@ -612,7 +612,7 @@ function AppMain({ settings }) {
   const isSaving = useRef(false);
 
   // Admin auth
-  const [adminAuthed, setAdminAuthedState] = useState(() => isAdminAuthed());
+  const [adminAuthed, setAdminAuthedState] = useState(true); // No login required; keep all existing tabs available.
   const [showAdminPrompt, setShowAdminPrompt] = useState(false);
   const [adminPwInput, setAdminPwInput] = useState("");
   const [adminPwError, setAdminPwError] = useState("");
