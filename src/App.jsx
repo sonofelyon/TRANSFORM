@@ -1414,7 +1414,7 @@ function AppMain({ settings }) {
                     </div>
                   ) : (
                     <button onClick={markPrayed} style={S.prayBtn}>
-                      <Heart size={16} style={{ marginRight: 8 }} /> {(pinnedPerson || keepPrayingMode) && withinWeek(current?.prayedAt) ? "Pray Again" : "Mark as Prayed"}
+                      {(pinnedPerson || keepPrayingMode) && withinWeek(current?.prayedAt) ? "Pray Again" : "Mark as Prayed"}
                     </button>
                   )}
 
