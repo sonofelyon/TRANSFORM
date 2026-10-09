@@ -1313,10 +1313,16 @@ function AppMain({ settings }) {
                       </div>
 
                       {current?.type === "student" && (
-                        <label style={{ display:"flex", alignItems:"center", gap:8, fontSize:13, color:current.contacted ? C.accentLight : C.muted, marginBottom:16, cursor:"pointer" }}>
-                          <input type="checkbox" checked={!!current.contacted} onChange={e => setPeople(prev => prev.map(q => q.id === current.id ? { ...q, contacted: e.target.checked, updatedAt: Date.now() } : q))} />
-                          Contacted
-                        </label>
+                        <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:16 }}>
+                          <div style={{ fontSize:13, color:C.cream }}>
+                            <span style={{ color:C.muted, marginRight:8 }}>Phone:</span>
+                            {current.phone ? <a href={`tel:${current.phone}`} style={{ color:C.accentLight, textDecoration:"none" }}>{current.phone}</a> : <span style={{ color:C.muted }}>Not added</span>}
+                          </div>
+                          <label style={{ display:"flex", alignItems:"center", gap:8, fontSize:13, color:current.contacted ? C.accentLight : C.muted, cursor:"pointer" }}>
+                            <input type="checkbox" checked={!!current.contacted} onChange={e => setPeople(prev => prev.map(q => q.id === current.id ? { ...q, contacted: e.target.checked, updatedAt: Date.now() } : q))} />
+                            Contacted
+                          </label>
+                        </div>
                       )}
 
                       {(current?.prayerRequests || []).length > 0 && (
