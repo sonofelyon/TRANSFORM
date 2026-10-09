@@ -1121,12 +1121,8 @@ function AppMain({ settings }) {
     <div style={S.root}>
       {/* Header */}
       <header style={S.header}>
-        <div style={S.logoWrap}>
-          <svg width="16" height="16" viewBox="0 0 20 20" style={{ flexShrink:0, marginTop:2 }}><path d="M10,2 L11.768,8.232 L18,10 L11.768,11.768 L10,18 L8.232,11.768 L2,10 L8.232,8.232 Z" fill="#6b9e78" /></svg>
-          <div style={{ display:"flex", flexDirection:"column", lineHeight:1 }}>
-            <span style={S.logoText}>{MINISTRY_NAME}</span>
-            {MINISTRY_SUB && <span style={S.logoSub}>{MINISTRY_SUB}</span>}
-          </div>
+        <div style={{ ...S.logoWrap, flex:"1 1 0", minWidth:0, marginRight:12 }}>
+          <img src="/Transform-logo.png" alt="Transform Student Ministries" style={{ display:"block", width:"100%", maxWidth:220, height:"auto", maxHeight:72, objectFit:"contain", objectPosition:"left center" }} />
         </div>
         <div style={{ ...S.weekBar, cursor: "pointer" }} onClick={() => setView("week")}>
           <Heart size={13} color={C.accent} fill={C.accent} />
