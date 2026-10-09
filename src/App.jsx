@@ -681,7 +681,14 @@ function AppMain({ settings }) {
             sum + (p.prayedWeekDate === prevWeekDateStr && p.weekPrayCount ? p.weekPrayCount : 1), 0
           );
           const total = data.filter(p => p.active !== false).length;
-          const newEntry = { weekStart: currentWeekStart, prevWeekStart, prevWeekDateStr, count: prevWeekCount, total };
+          const prevWeekContacts = data.filter(p => p.active !== false && p.type === "student" && (
+            p.contactedWeekDate === prevWeekDateStr ||
+            (!p.contactedWeekDate && p.contactedAt && p.contactedAt >= prevWeekStart && p.contactedAt < currentWeekStart)
+          ));
+          const contactCount = prevWeekContacts.length;
+          const contactSessions = prevWeekContacts.reduce((sum, p) => sum + (p.contactedWeekDate === prevWeekDateStr && p.weekContactCount ? p.weekContactCount : 1), 0);
+          const contactTotal = data.filter(p => p.active !== false && p.type === "student").length;
+          const newEntry = { weekStart: currentWeekStart, prevWeekStart, prevWeekDateStr, count: prevWeekCount, total, contactCount, contactSessions, contactTotal };
           const updated = [newEntry, ...history].slice(0, 52);
           setWeekHistory(updated);
           await apiSaveHistory(updated);
@@ -814,6 +821,9 @@ function AppMain({ settings }) {
   const current = pinnedPerson ?? deck[cardIdx] ?? null;
 
   const prayedPeople = activePeople.filter(p => withinWeek(p.prayedAt));
+  const activeStudents = activePeople.filter(p => p.type === "student");
+  const contactedThisWeek = activeStudents.filter(p => withinWeek(p.contactedAt));
+  const contactSessionsThisWeek = contactedThisWeek.reduce((sum, p) => sum + (p.weekContactCount || 1), 0);
 
   // Streak: consecutive weeks where count >= total (everyone prayed for)
   const streak = React.useMemo(() => {
@@ -930,6 +940,26 @@ function AppMain({ settings }) {
     } else {
       setSwipeDelta(0);
     }
+  }
+
+  function markContacted() {
+    if (!current || current.type !== "student") return;
+    const now = Date.now();
+    const weekStart = getWeekStartET();
+    const weekDateStr = getWeekDateStringET();
+    setPeople(prev => prev.map(p => {
+      if (p.id !== current.id) return p;
+      const sameWeek = p.contactedWeekDate === weekDateStr || (!p.contactedWeekDate && p.contactedAt && p.contactedAt >= weekStart);
+      return { ...p, contacted: true, contactedAt: now, contactedWeekDate: weekDateStr,
+        contactCount: (p.contactCount || 0) + 1,
+        weekContactCount: sameWeek ? (p.weekContactCount || 1) + 1 : 1, updatedAt: now };
+    }));
+  }
+
+  function unmarkContacted() {
+    if (!current || current.type !== "student") return;
+    setPeople(prev => prev.map(p => p.id === current.id ? { ...p, contacted: false, contactedAt: null,
+      contactedWeekDate: null, weekContactCount: 0, updatedAt: Date.now() } : p));
   }
 
   function markPrayed() {
@@ -1105,7 +1135,7 @@ function AppMain({ settings }) {
         sum + (p.prayedWeekDate === wDateStr && p.weekPrayCount ? p.weekPrayCount : 1), 0
       );
       if (count > 0) {
-        newHistory.push({ weekStart: wEnd, prevWeekStart: wStart, prevWeekDateStr: wDateStr, count, total: activePeople.length });
+        newHistory.push({ ...weekHistory.find(w => w.weekStart === wEnd), weekStart: wEnd, prevWeekStart: wStart, prevWeekDateStr: wDateStr, count, total: activePeople.length });
       }
     }
     setWeekHistory(newHistory);
@@ -1330,10 +1360,7 @@ function AppMain({ settings }) {
                             <span style={{ color:C.muted, marginRight:8 }}>Phone:</span>
                             {current.phone ? <a href={`tel:${current.phone}`} style={{ color:C.accentLight, textDecoration:"none" }}>{current.phone}</a> : <span style={{ color:C.muted }}>Not added</span>}
                           </div>
-                          <label style={{ display:"flex", alignItems:"center", gap:8, fontSize:13, color:current.contacted ? C.accentLight : C.muted, cursor:"pointer" }}>
-                            <input type="checkbox" checked={!!current.contacted} onChange={e => setPeople(prev => prev.map(q => q.id === current.id ? { ...q, contacted: e.target.checked, ...(e.target.checked ? { contactedAt: Date.now() } : {}), updatedAt: Date.now() } : q))} />
-                            Contacted
-                          </label>
+                          {withinWeek(current.contactedAt) && <span style={S.prayedChip}>✓ Contacted {timeAgo(current.contactedAt)}</span>}
                           <span style={{ fontSize:13, color:C.muted }}>
                             Last Contacted: {current.contactedAt ? new Date(current.contactedAt).toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" }) : "Not yet recorded"}
                           </span>
@@ -1389,6 +1416,20 @@ function AppMain({ settings }) {
                     <button onClick={markPrayed} style={S.prayBtn}>
                       <Heart size={16} style={{ marginRight: 8 }} /> {(pinnedPerson || keepPrayingMode) && withinWeek(current?.prayedAt) ? "Pray Again" : "Mark as Prayed"}
                     </button>
+                  )}
+
+                  {current?.type === "student" && (
+                    <div style={{ marginTop: 10 }}>
+                      {withinWeek(current.contactedAt) ? (
+                        <div style={S.prayedActions}>
+                          <div style={S.prayedConfirm}>✓ Contacted this week</div>
+                          <button onClick={unmarkContacted} style={S.undoBtn}>Undo</button>
+                          <button onClick={markContacted} style={S.undoBtn}>Contact Again</button>
+                        </div>
+                      ) : (
+                        <button onClick={markContacted} style={{ ...S.prayBtn, width:"100%" }}>Mark as Contacted</button>
+                      )}
+                    </div>
                   )}
 
                   {/* Quick-find dropdown */}
@@ -1780,6 +1821,22 @@ function AppMain({ settings }) {
       {/* ─── REPORT ─── */}
       {view === "report" && (
         <div style={S.importWrap}>
+          <div style={S.reportBox}>
+            <p style={S.reportTitle}>Contact Tracking — This Week</p>
+            <div style={S.reportRowTop}><span style={S.reportWeekLabel}>Students contacted</span><span style={S.reportCount}>{contactedThisWeek.length} / {activeStudents.length}</span></div>
+            <div style={S.reportBar}><div style={{ ...S.reportBarFill, width: `${activeStudents.length ? Math.round(contactedThisWeek.length / activeStudents.length * 100) : 0}%` }} /></div>
+            <p style={S.reportPct}>{contactSessionsThisWeek} contact sessions this week</p>
+            <p style={{ ...S.reportTitle, marginTop:18 }}>Weekly Contact History</p>
+            {weekHistory.length === 0 ? <p style={S.reportEmpty}>Weekly contact history will appear after the next Monday reset.</p> :
+              weekHistory.map((w, i) => {
+                const label = `${getWeekLabel(w.prevWeekStart)} – ${getWeekLabel(w.weekStart - 1)}`;
+                const pct = w.contactTotal ? Math.round((w.contactCount || 0) / w.contactTotal * 100) : 0;
+                return <div key={w.weekStart} style={S.reportRow}>
+                  <div style={S.reportRowTop}><span style={S.reportWeekLabel}>{label}</span><span style={S.reportCount}>{w.contactCount == null ? "No historical data" : `${w.contactCount} / ${w.contactTotal}`}</span></div>
+                  {w.contactCount != null && <><div style={S.reportBar}><div style={{ ...S.reportBarFill, width:`${pct}%` }} /></div><span style={S.reportPct}>{w.contactSessions || 0} contact sessions</span></>}
+                </div>;
+              })}
+          </div>
           <div style={S.reportBox}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}><BarChart2 size={16} color={C.accent} /><p style={{ ...S.reportTitle, margin:0 }}>Weekly Prayer Report</p></div>
