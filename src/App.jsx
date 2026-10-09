@@ -152,6 +152,14 @@ function getPrevWeekDateStringET() {
   return `${monET.getMonth()+1}/${monET.getDate()}/${monET.getFullYear()}`;
 }
 
+function getMonthKeyET(ts = Date.now()) {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone:"America/New_York", year:"numeric", month:"2-digit" }).formatToParts(new Date(ts));
+  return `${parts.find(p => p.type === "year").value}-${parts.find(p => p.type === "month").value}`;
+}
+function withinMonth(ts) {
+  return !!ts && getMonthKeyET(ts) === getMonthKeyET();
+}
+
 function withinWeek(ts) {
   return ts && ts >= getWeekStartET();
 }
@@ -950,7 +958,8 @@ function AppMain({ settings }) {
     setPeople(prev => prev.map(p => {
       if (p.id !== current.id) return p;
       const sameWeek = p.contactedWeekDate === weekDateStr || (!p.contactedWeekDate && p.contactedAt && p.contactedAt >= weekStart);
-      return { ...p, contacted: true, contactedAt: now, contactedWeekDate: weekDateStr,
+      return { ...p, contacted: true, contactedAt: now, contactedWeekDate: weekDateStr, contactedMonthKey: getMonthKeyET(now),
+        monthContactCount: p.contactedMonthKey === getMonthKeyET(now) ? (p.monthContactCount || 1) + 1 : 1,
         contactCount: (p.contactCount || 0) + 1,
         weekContactCount: sameWeek ? (p.weekContactCount || 1) + 1 : 1, updatedAt: now };
     }));
@@ -969,7 +978,7 @@ function AppMain({ settings }) {
       const weekStart = getWeekStartET();
       const inSameWeek = p.prayedAt && p.prayedAt >= weekStart;
       const weekDateStr = getWeekDateStringET();
-      return { ...p, prayedAt: Date.now(), prayedWeek: weekStart, prayedWeekDate: weekDateStr, prayCount: (p.prayCount || 0) + 1, weekPrayCount: inSameWeek ? (p.weekPrayCount || 1) + 1 : 1, updatedAt: Date.now() };
+      return { ...p, prayedAt: Date.now(), prayedWeek: weekStart, prayedWeekDate: weekDateStr, prayedMonthKey: getMonthKeyET(), monthPrayCount: p.prayedMonthKey === getMonthKeyET() ? (p.monthPrayCount || 1) + 1 : 1, prayCount: (p.prayCount || 0) + 1, weekPrayCount: inSameWeek ? (p.weekPrayCount || 1) + 1 : 1, updatedAt: Date.now() };
     }));
     if (current?.id) dismissBday(current.id);
     setPinnedPersonId(null);
@@ -1185,7 +1194,7 @@ function AppMain({ settings }) {
 
       {/* Tabs */}
       <nav style={S.tabs}>
-        {[["pray","Pray"],["week","Week"],["roster","Roster"]].map(([v, label]) => (
+        {[["pray","Pray"],["week","Week"],["month","Month"]].map(([v, label]) => (
           <button key={v} onClick={() => setView(v)} style={{ ...S.tab, ...(view === v ? S.tabActive : {}) }}>{label}</button>
         ))}
         {adminAuthed && [["people","People"],["report","Report"],["import","Import"]].map(([v, label]) => (
@@ -1759,86 +1768,42 @@ function AppMain({ settings }) {
       )}
 
 
-      {/* ─── ROSTER ─── */}
-      {view === "roster" && (
-        <div style={S.importWrap}>
-          {/* Group filter */}
-          <div style={{ display:"flex", gap:0, marginBottom:12, borderRadius:10, overflow:"hidden", border:`1px solid ${C.border}` }}>
-            {[["all","All"],["student","Students"],["leader","Leaders"]].map(([val, label]) => (
-              <button key={val} onClick={() => setRosterGroup(val)} style={{ flex:1, background: rosterGroup === val ? C.accent : C.surface, border:"none", color: rosterGroup === val ? "#fff" : C.muted, padding:"9px 0", fontSize:13, fontWeight: rosterGroup === val ? 600 : 400, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif", transition:"background 0.15s" }}>
-                {label}
-              </button>
-            ))}
+      {/* ─── MONTH SUMMARY ─── */}
+      {view === "month" && (() => {
+        const prayed = activePeople.filter(p => p.prayedMonthKey === getMonthKeyET() || (!p.prayedMonthKey && withinMonth(p.prayedAt))).sort((a,b) => (b.prayedAt || 0) - (a.prayedAt || 0));
+        const waiting = activePeople.filter(p => !prayed.some(q => q.id === p.id)).sort((a,b) => a.name.localeCompare(b.name));
+        const contacted = activeStudents.filter(p => p.contactedMonthKey === getMonthKeyET() || (!p.contactedMonthKey && withinMonth(p.contactedAt))).sort((a,b) => (b.contactedAt || 0) - (a.contactedAt || 0));
+        const monthName = new Date().toLocaleDateString("en-US", { month:"long", year:"numeric", timeZone:"America/New_York" });
+        const renderRows = (people, kind) => people.map(p => (
+          <div key={p.id} onClick={() => goToPerson(p.id)} style={{ ...S.weekRow, cursor:"pointer" }}>
+            <div>
+              <div style={{ ...S.weekName, display:"flex", gap:6, alignItems:"center" }}>
+                {p.name}
+                {kind && (p[kind === "prayed" ? "monthPrayCount" : "monthContactCount"] || 0) > 1 && (
+                  <span style={{ fontSize:11, color:C.accent, fontWeight:700, background:C.faint, padding:"1px 6px", borderRadius:8 }}>x{p[kind === "prayed" ? "monthPrayCount" : "monthContactCount"]}</span>
+                )}
+              </div>
+              {kind && <div style={S.weekMeta}>{timeAgo(p[kind === "prayed" ? "prayedAt" : "contactedAt"])}</div>}
+            </div>
+            {kind && <span style={{ color:C.accent, fontSize:18 }}>✓</span>}
           </div>
-
-          {/* Sort filter */}
-          <div style={{ display:"flex", gap:16, marginBottom:12, justifyContent:"center" }}>
-            {[["name","A–Z"],["grade","Grade"],["birthday","Birthday"]].map(([val, label]) => (
-              <button key={val} onClick={() => setRosterSort(val)} style={{ background:"none", border:"none", borderBottom: rosterSort === val ? `2px solid ${C.accent}` : "2px solid transparent", color: rosterSort === val ? C.cream : C.muted, fontSize:13, fontWeight: rosterSort === val ? 500 : 400, padding:"2px 0", cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif" }}>
-                {label}
-              </button>
-            ))}
+        ));
+        return <div style={S.weekWrap}>
+          <h2 style={S.weekTitle}>{monthName}</h2>
+          <div style={S.weekSection}>
+            <div style={S.sectionHead}><span style={S.sectionTitle}>Prayed For — {prayed.length}</span></div>
+            {prayed.length ? renderRows(prayed,"prayed") : <p style={S.weekEmpty}>No one marked as prayed for this month.</p>}
           </div>
-
-          {/* People list */}
-          <div style={{ display:"flex", flexDirection:"column", gap:1 }}>
-            {activePeople
-              .filter(p => rosterGroup === "all" ? true : p.type === rosterGroup)
-              .slice().sort((a, b) => {
-                if (rosterSort === "grade") {
-                  const ga = Number(a.grade) || 99;
-                  const gb = Number(b.grade) || 99;
-                  return ga !== gb ? ga - gb : a.name.localeCompare(b.name);
-                }
-                if (rosterSort === "birthday") {
-                  // Sort by days until next birthday (soonest first, just-passed at end)
-                  const daysUntil = (bday) => {
-                    if (!bday) return 9999;
-                    const [m, d] = bday.split("-").map(Number);
-                    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
-                    const thisYear = new Date(now.getFullYear(), m - 1, d);
-                    let diff = Math.ceil((thisYear - now) / 86400000);
-                    if (diff < 0) diff += 365; // already passed this year — push to end
-                    return diff;
-                  };
-                  const da = daysUntil(a.birthday);
-                  const db = daysUntil(b.birthday);
-                  return da !== db ? da - db : a.name.localeCompare(b.name);
-                }
-                return a.name.localeCompare(b.name);
-              })
-              .map(p => {
-                const bdayFmt = p.birthday ? (() => { const [m, d] = p.birthday.split("-"); const date = new Date(2000, parseInt(m)-1, parseInt(d)); return date.toLocaleDateString("en-US", { month:"short", day:"numeric" }); })() : null;
-                return (
-                  <div key={p.id} style={{ display:"flex", alignItems:"center", padding:"11px 14px", background:C.surface, borderRadius:8, gap:12 }}>
-                    {/* Photo */}
-
-                    {/* Text — left aligned below name */}
-                    <div style={{ display:"flex", flexDirection:"column", gap:3, flex:1, minWidth:0 }}>
-                      <span style={{ fontSize:15, color:C.cream, fontFamily:"'Lora', Georgia, serif" }}>{p.name}</span>
-                      <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
-                        {p.type === "student" && p.grade && (
-                          <span style={{ fontSize:13, color:C.muted, fontWeight:600 }}>{ordinal(p.grade)} Grade</span>
-                        )}
-                        {p.type === "leader" && p.group && (
-                          <span style={{ fontSize:13, color:C.muted, fontWeight:600 }}>{p.group.toUpperCase()}</span>
-                        )}
-                        {bdayFmt && <span style={{ fontSize:13, color:C.muted, display:"flex", alignItems:"center", gap:3 }}><Cake size={12} />{bdayFmt}</span>}
-                      </div>
-                    </div>
-                    {/* Group badge */}
-                    {p.group && <span style={{ fontSize:10, fontWeight:600, color: p.group === "hs" ? "#7aafc4" : C.accent, background: p.group === "hs" ? C.studentBg : C.accentBg, borderRadius:6, padding:"2px 7px", flexShrink:0 }}>{p.group.toUpperCase()}</span>}
-                  </div>
-                );
-              })
-            }
-            {activePeople.filter(p => rosterGroup === "all" ? true : p.type === rosterGroup).length === 0 && (
-              <p style={{ textAlign:"center", color:C.muted, fontSize:13, padding:"32px 0" }}>No one in this group yet.</p>
-            )}
+          <div style={S.weekSection}>
+            <div style={S.sectionHead}><span style={S.sectionTitle}>Contacted — {contacted.length}</span></div>
+            {contacted.length ? renderRows(contacted,"contacted") : <p style={S.weekEmpty}>No students marked as contacted this month.</p>}
           </div>
-        </div>
-      )}
-
+          <div style={S.weekSection}>
+            <div style={S.sectionHead}><span style={S.sectionTitle}>Still Waiting for Prayer — {waiting.length}</span></div>
+            {waiting.length ? renderRows(waiting,null) : <p style={S.weekEmpty}>Everyone has been prayed for this month!</p>}
+          </div>
+        </div>;
+      })()}
 
       {/* ─── REPORT ─── */}
       {view === "report" && (
