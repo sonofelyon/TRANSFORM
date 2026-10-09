@@ -1121,8 +1121,9 @@ function AppMain({ settings }) {
     <div style={S.root}>
       {/* Header */}
       <header style={S.header}>
-        <div style={{ ...S.logoWrap, flex:"1 1 0", minWidth:0, marginRight:12 }}>
-          <img src="/Transform-logo.png" alt="Transform Student Ministries" style={{ display:"block", width:"100%", maxWidth:220, height:"auto", maxHeight:72, objectFit:"contain", objectPosition:"left center" }} />
+        <div style={{ ...S.logoWrap, flex:"1 1 auto", minWidth:0, marginRight:12, gap:12 }}>
+          <img src="/Transform-logo.png" alt="Transform Student Ministries" style={{ display:"block", width:"auto", maxWidth:"48%", height:"auto", maxHeight:72, objectFit:"contain", objectPosition:"left center", flexShrink:1 }} />
+          <span style={{ fontFamily:"'Lora', Georgia, serif", fontSize:"clamp(13px, 3.5vw, 20px)", fontWeight:600, color:C.cream, lineHeight:1.2, whiteSpace:"normal" }}>Prayer and Contact</span>
         </div>
         <div style={{ ...S.weekBar, cursor: "pointer" }} onClick={() => setView("week")}>
           <Heart size={13} color={C.accent} fill={C.accent} />
