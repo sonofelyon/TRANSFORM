@@ -95,6 +95,17 @@ async function apiSaveHistory(history) {
   });
 }
 
+async function apiLoadMonthHistory() {
+  const res = await fetch("/api/month-history");
+  if (!res.ok) return [];
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+async function apiSaveMonthHistory(history) {
+  const res = await fetch("/api/month-history", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(history) });
+  if (!res.ok) throw new Error("Could not save monthly history");
+}
+
 function getWeekLabel(weekStartTs) {
   // Show the Monday date of that week clearly
   const d = new Date(weekStartTs);
@@ -620,6 +631,7 @@ function AppMain({ settings }) {
   const [confirmPromo, setConfirmPromo] = useState(false);
   const [confirmClearInactive, setConfirmClearInactive] = useState(false);
   const [weekHistory, setWeekHistory] = useState([]);
+  const [monthHistory, setMonthHistory] = useState([]);
   const [bdayInput, setBdayInput] = useState("");
 
   // Prayer requests
@@ -667,7 +679,8 @@ function AppMain({ settings }) {
   useEffect(() => {
     (async () => {
       try {
-        const [data, history] = await Promise.all([apiLoad(), apiLoadHistory()]);
+        const [data, history, months] = await Promise.all([apiLoad(), apiLoadHistory(), apiLoadMonthHistory()]);
+        setMonthHistory(months);
         if (data.length > 0) setPeople(data);
 
         const currentWeekStart = getWeekStartET();
@@ -702,6 +715,22 @@ function AppMain({ settings }) {
           await apiSaveHistory(updated);
         } else {
           setWeekHistory(history);
+        }
+        // Record the previous calendar month when the app is opened after rollover.
+        // Only last recorded activity is available; do not invent missing events.
+        const currentMonth = getMonthKeyET();
+        const priorMonth = getMonthKeyET(new Date(new Date().toLocaleString("en-US", {timeZone:"America/New_York"})).setDate(0));
+        if (!months.some(m => m.month === priorMonth) && data.some(p => p.prayedMonthKey === priorMonth || p.contactedMonthKey === priorMonth)) {
+          const active = data.filter(p => p.active !== false);
+          const students = active.filter(p => p.type === "student");
+          const prayed = active.filter(p => p.prayedMonthKey === priorMonth);
+          const contacted = students.filter(p => p.contactedMonthKey === priorMonth);
+          const entry = { month:priorMonth, prayed:prayed.length, total:active.length, contacted:contacted.length,
+            studentTotal:students.length, prayerSessions:prayed.reduce((n,p)=>n+(p.monthPrayCount||1),0),
+            contactSessions:contacted.reduce((n,p)=>n+(p.monthContactCount||1),0) };
+          const updatedMonths = [entry,...months].slice(0,24);
+          setMonthHistory(updatedMonths);
+          await apiSaveMonthHistory(updatedMonths);
         }
         setLoaded(true);
       } catch {
@@ -1808,6 +1837,38 @@ function AppMain({ settings }) {
       {/* ─── REPORT ─── */}
       {view === "report" && (
         <div style={S.importWrap}>
+          <div style={S.reportBox}>
+            <p style={S.reportTitle}>Monthly Prayer and Contact Report</p>
+            {(() => {
+              const prayed = activePeople.filter(p => withinMonth(p.prayedAt));
+              const contacted = activeStudents.filter(p => withinMonth(p.contactedAt));
+              const prayerSessions = prayed.reduce((n,p) => n + (p.prayedMonthKey === getMonthKeyET() ? (p.monthPrayCount || 1) : 1), 0);
+              const contactSessions = contacted.reduce((n,p) => n + (p.contactedMonthKey === getMonthKeyET() ? (p.monthContactCount || 1) : 1), 0);
+              const rows = [
+                { label:"Prayed for", count:prayed.length, total:activePeople.length, sessions:prayerSessions },
+                { label:"Students contacted", count:contacted.length, total:activeStudents.length, sessions:contactSessions }
+              ];
+              return <>
+                <p style={S.reportWeekLabel}>{new Date().toLocaleDateString("en-US",{month:"long",year:"numeric",timeZone:"America/New_York"})}</p>
+                {rows.map(row => <div key={row.label} style={{ ...S.reportRow, marginTop:12 }}>
+                  <div style={S.reportRowTop}><span style={S.reportWeekLabel}>{row.label}</span><span style={S.reportCount}>{row.count} / {row.total}</span></div>
+                  <div style={S.reportBar}><div style={{ ...S.reportBarFill, width:`${row.total ? Math.round(row.count/row.total*100) : 0}%` }} /></div>
+                  <span style={S.reportPct}>{row.total ? Math.round(row.count/row.total*100) : 0}% · {row.sessions} sessions recorded</span>
+                </div>)}
+              </>;
+            })()}
+            <p style={{ ...S.reportTitle, marginTop:20 }}>Previous Months</p>
+            {monthHistory.length === 0 ? <p style={S.reportEmpty}>Monthly history will appear after a month ends. Earlier months cannot be reconstructed completely.</p> :
+              monthHistory.map(m => <div key={m.month} style={{ ...S.reportRow, marginTop:12 }}>
+                <span style={{ ...S.reportWeekLabel, fontWeight:600 }}>{m.month}</span>
+                <div style={S.reportRowTop}><span style={S.reportWeekLabel}>Prayed for</span><span style={S.reportCount}>{m.prayed} / {m.total}</span></div>
+                <div style={S.reportBar}><div style={{ ...S.reportBarFill, width:`${m.total ? Math.round(m.prayed/m.total*100) : 0}%` }} /></div>
+                <span style={S.reportPct}>{m.prayerSessions} prayer sessions</span>
+                <div style={S.reportRowTop}><span style={S.reportWeekLabel}>Contacted</span><span style={S.reportCount}>{m.contacted} / {m.studentTotal}</span></div>
+                <div style={S.reportBar}><div style={{ ...S.reportBarFill, width:`${m.studentTotal ? Math.round(m.contacted/m.studentTotal*100) : 0}%` }} /></div>
+                <span style={S.reportPct}>{m.contactSessions} contact sessions</span>
+              </div>)}
+          </div>
           <div style={S.reportBox}>
             <p style={S.reportTitle}>Contact Tracking — This Week</p>
             <div style={S.reportRowTop}><span style={S.reportWeekLabel}>Students contacted</span><span style={S.reportCount}>{contactedThisWeek.length} / {activeStudents.length}</span></div>
