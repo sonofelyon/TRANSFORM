@@ -1312,6 +1312,13 @@ function AppMain({ settings }) {
                         )}
                       </div>
 
+                      {current?.type === "student" && (
+                        <label style={{ display:"flex", alignItems:"center", gap:8, fontSize:13, color:current.contacted ? C.accentLight : C.muted, marginBottom:16, cursor:"pointer" }}>
+                          <input type="checkbox" checked={!!current.contacted} onChange={e => setPeople(prev => prev.map(q => q.id === current.id ? { ...q, contacted: e.target.checked, updatedAt: Date.now() } : q))} />
+                          Contacted
+                        </label>
+                      )}
+
                       {(current?.prayerRequests || []).length > 0 && (
                         <div style={S.reqBox}>
                           <p style={S.reqLabel}>Prayer Requests</p>
@@ -1620,10 +1627,7 @@ function AppMain({ settings }) {
                       <input type="tel" value={p.phone || ""} onChange={e => setPeople(prev => prev.map(q => q.id === p.id ? { ...q, phone: e.target.value, updatedAt: Date.now() } : q))}
                         placeholder="Add phone number" aria-label={`Phone number for ${p.name}`}
                         style={{ ...S.addInput, flex:1, minWidth:130, margin:0, fontSize:13 }} />
-                      <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:p.contacted ? C.accentLight : C.muted, whiteSpace:"nowrap", cursor:"pointer" }}>
-                        <input type="checkbox" checked={!!p.contacted} onChange={e => setPeople(prev => prev.map(q => q.id === p.id ? { ...q, contacted: e.target.checked, updatedAt: Date.now() } : q))} />
-                        Contacted
-                      </label>
+
                     </div>
                   </>
                 )}
