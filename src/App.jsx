@@ -997,7 +997,7 @@ function AppMain({ settings }) {
 
   function unmarkPrayed() {
     if (!current) return;
-    setPeople(prev => prev.map(p => p.id === current.id ? { ...p, prayedAt: null, updatedAt: Date.now() } : p));
+    setPeople(prev => prev.map(p => p.id === current.id ? { ...p, prayedAt: null, prayedMonthKey: null, monthPrayCount: 0, updatedAt: Date.now() } : p));
   }
 
   const [addGrade, setAddGrade] = useState("");
@@ -1770,9 +1770,9 @@ function AppMain({ settings }) {
 
       {/* ─── MONTH SUMMARY ─── */}
       {view === "month" && (() => {
-        const prayed = activePeople.filter(p => p.prayedMonthKey === getMonthKeyET() || (!p.prayedMonthKey && withinMonth(p.prayedAt))).sort((a,b) => (b.prayedAt || 0) - (a.prayedAt || 0));
+        const prayed = activePeople.filter(p => withinMonth(p.prayedAt)).sort((a,b) => (b.prayedAt || 0) - (a.prayedAt || 0));
         const waiting = activePeople.filter(p => !prayed.some(q => q.id === p.id)).sort((a,b) => a.name.localeCompare(b.name));
-        const contacted = activeStudents.filter(p => p.contactedMonthKey === getMonthKeyET() || (!p.contactedMonthKey && withinMonth(p.contactedAt))).sort((a,b) => (b.contactedAt || 0) - (a.contactedAt || 0));
+        const contacted = activeStudents.filter(p => withinMonth(p.contactedAt)).sort((a,b) => (b.contactedAt || 0) - (a.contactedAt || 0));
         const monthName = new Date().toLocaleDateString("en-US", { month:"long", year:"numeric", timeZone:"America/New_York" });
         const renderRows = (people, kind) => people.map(p => (
           <div key={p.id} onClick={() => goToPerson(p.id)} style={{ ...S.weekRow, cursor:"pointer" }}>
